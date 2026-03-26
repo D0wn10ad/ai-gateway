@@ -1,0 +1,74 @@
+/* Custom styles for elements Tailwind can't handle */
+
+/* Skeleton loading animation */
+.skeleton {
+    animation: skeleton-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes skeleton-pulse {
+    from { background-color: hsl(210, 15%, 88%); }
+    to   { background-color: hsl(210, 15%, 95%); }
+}
+
+/* Stacked bar chart — uses CSS custom properties set by JS */
+.usage-bar {
+    display: flex;
+    height: clamp(40px, 8vw, 56px);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #f0f0f0;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.segment {
+    flex-grow: var(--value);
+    background-color: var(--color);
+    transition: flex-grow 0.3s ease;
+    min-width: 2px;
+    position: relative;
+}
+
+.segment:hover {
+    filter: brightness(1.08);
+}
+
+/* Coaching loading animation */
+.coaching-pulse {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.08); }
+}
+
+/* Coaching tip cards */
+.coaching-tip {
+    border-left: 3px solid;
+    transition: background-color 0.15s ease;
+}
+
+.coaching-tip:hover {
+    background-color: hsl(210, 15%, 97%);
+}
+
+.coaching-tip[data-category="FILES"]   { border-left-color: #4477AA; }
+.coaching-tip[data-category="CONTEXT"] { border-left-color: #CCBB44; }
+.coaching-tip[data-category="MODEL"]   { border-left-color: #228833; }
+.coaching-tip[data-category="GENERAL"] { border-left-color: #999999; }
+
+.category-badge {
+    display: inline-block;
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 4px;
+    line-height: 1.4;
+}
+
+.category-badge[data-category="FILES"]   { background: #4477AA20; color: #4477AA; }
+.category-badge[data-category="CONTEXT"] { background: #CCBB4420; color: #998800; }
+.category-badge[data-category="MODEL"]   { background: #22883320; color: #228833; }
+.category-badge[data-category="GENERAL"] { background: #99999920; color: #777777; }

@@ -1,0 +1,29 @@
+# Secrets and sensitive files
+.env
+ssl/*
+!ssl/README.md
+litellm/vertex-credentials.json
+
+# Data directories
+data/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+
+# Backup files
+*.bak
+*.backup

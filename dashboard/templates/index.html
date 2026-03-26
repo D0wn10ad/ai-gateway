@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Usage Limits - AI Gateway</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { DEFAULT: '#2563EB', dark: '#1D4ED8' },
+                    },
+                },
+            },
+        };
+    </script>
+    <link rel="stylesheet" href="/dashboard/static/css/styles.css">
+</head>
+<body class="min-h-screen bg-gray-50 p-4 sm:p-6">
+    <div class="mx-auto max-w-xl rounded-xl bg-white shadow-md ring-1 ring-gray-100 p-5 sm:p-8">
+        <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Your Usage Limits</h1>
+
+        <!-- Loading state (skeleton) -->
+        <div id="loading" class="py-10 text-center text-gray-400">
+            <div class="skeleton h-14 rounded-lg mb-6"></div>
+            <div class="skeleton h-48 rounded-lg"></div>
+        </div>
+
+        <!-- Error state -->
+        <div id="error-state" class="mt-6 rounded-lg border-2 border-red-300 bg-red-50 p-6 text-center" style="display:none;">
+            <h2 class="text-lg font-semibold text-red-700 mb-1">Unable to load usage data</h2>
+            <p id="error-message" class="text-red-600 text-sm leading-relaxed mb-4">Something went wrong. Please try again.</p>
+            <button id="retry-button"
+                class="inline-flex items-center gap-2 rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 min-h-[44px] cursor-pointer">
+                Retry
+            </button>
+        </div>
+
+        <!-- Empty state -->
+        <div id="empty-state" class="mt-6 rounded-lg bg-gray-50 ring-1 ring-gray-200 p-8 sm:p-10 text-center" style="display:none;">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">No usage yet this week</h2>
+            <p class="text-gray-500 text-sm leading-relaxed mb-5">You haven't used any AI models yet this week. Your weekly usage resets every Monday.</p>
+            <p>
+                <a href="https://chat.example.edu"
+                   class="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand min-h-[44px] no-underline">
+                    Open AI Gateway
+                </a>
+            </p>
+        </div>
+
+        <!-- Dashboard content -->
+        <div id="dashboard-content" style="display:none;">
+            <p id="period-header" class="mt-4 text-center text-sm text-gray-500"></p>
+
+            <p class="mt-3 mb-5 text-center text-xl sm:text-2xl text-gray-700">
+                <span class="font-bold text-brand" id="total-percentage">0%</span> of your weekly limit used
+            </p>
+
+            <figure>
+                <figcaption class="sr-only" id="chart-caption">Usage breakdown by AI model</figcaption>
+
+                <div id="usage-chart" class="my-5" aria-hidden="true">
+                    <div class="usage-bar" role="img" aria-label="Weekly usage by model">
+                        <!-- Segments populated by JavaScript -->
+                    </div>
+                </div>
+
+                <table class="sr-only" id="sr-table">
+                    <caption>Weekly AI model usage breakdown</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Model</th>
+                            <th scope="col">Tokens</th>
+                            <th scope="col">Percentage of Limit</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sr-table-body"></tbody>
+                </table>
+            </figure>
+
+            <ul id="legend" class="space-y-2" aria-label="Model usage details">
+                <!-- Items populated by JavaScript -->
+            </ul>
+        </div>
+
+        <!-- Coaching section (shown after usage data loads successfully) -->
+        <div id="coaching-section" style="display:none;">
+            <hr class="my-8 border-gray-200">
+
+            <!-- Coaching loading animation -->
+            <div id="coaching-loading" style="display:none;">
+                <div class="flex flex-col items-center py-8 text-center">
+                    <div class="coaching-pulse mb-4">
+                        <svg class="w-10 h-10 text-brand" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+                        </svg>
+                    </div>
+                    <p class="text-base font-semibold text-gray-700 mb-1">Generating your personalized AI insights...</p>
+                    <p class="text-xs text-gray-400">Analyzing your conversations and spending patterns</p>
+                </div>
+            </div>
+
+            <!-- Coaching content -->
+            <div id="coaching-content" style="display:none;">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-900 mb-1">Week in Review</h2>
+                <p id="coaching-summary" class="text-sm text-gray-600 leading-relaxed mb-4"></p>
+                <div id="coaching-tips" class="space-y-3"></div>
+
+                <!-- Privacy statement -->
+                <p class="mt-5 text-xs text-gray-400 leading-relaxed">
+                    Your coaching tips are generated by analyzing your chat topics, messages, file upload patterns, and spending data from the past week. This analysis uses the same AI services you already use through the AI Gateway and is only visible to you. Your conversations remain private.
+                </p>
+                <p id="coaching-timestamp" class="mt-1 text-xs text-gray-300"></p>
+            </div>
+
+            <!-- Coaching unavailable -->
+            <div id="coaching-unavailable" style="display:none;">
+                <h2 class="text-lg sm:text-xl font-bold text-gray-900 mb-1">Week in Review</h2>
+                <p class="text-sm text-gray-500 italic">AI coaching tips are temporarily unavailable. Check back later.</p>
+            </div>
+        </div>
+
+        <!-- Feedback section (shown after auth, independent of usage state) -->
+        <div id="feedback-section" style="display:none;">
+            <hr class="my-8 border-gray-200">
+            <h2 class="text-lg sm:text-xl font-bold text-gray-900 mb-1">Share Your Feedback</h2>
+            <p class="text-sm text-gray-500 leading-relaxed mb-5">Help us improve the AI Gateway. Suggestions, issues, or feature requests</p>
+
+            <form id="feedback-form" class="space-y-3" novalidate>
+                <div>
+                    <textarea
+                        id="feedback-message"
+                        class="block w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none resize-y min-h-[120px]"
+                        placeholder="What's on your mind? (minimum 10 characters)"
+                        minlength="10"
+                        maxlength="5000"
+                        rows="4"
+                        required
+                        aria-describedby="char-counter"
+                    ></textarea>
+                    <span id="char-counter" class="mt-1 block text-right text-xs text-gray-400 transition-colors" aria-live="polite">0 / 5,000</span>
+                </div>
+                <button type="submit" id="feedback-submit"
+                    class="inline-flex items-center gap-2 rounded-lg bg-brand px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px] cursor-pointer"
+                    disabled>
+                    <svg class="h-4 w-4 -ml-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5"/></svg>
+                    Send Feedback
+                </button>
+            </form>
+
+            <div id="feedback-error" class="mt-3 rounded-lg border-2 border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 leading-relaxed" style="display:none;" role="alert"></div>
+
+            <div id="feedback-success" class="mt-3 flex items-center gap-3 rounded-lg border-2 border-green-300 bg-green-50 px-4 py-3" style="display:none;" role="status">
+                <svg class="h-6 w-6 flex-shrink-0 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="11"/>
+                    <path d="M7 12.5l3 3 7-7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <p class="text-sm font-semibold text-brand m-0">Thank you! Your feedback has been sent.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get Open WebUI token from shared localStorage (same origin: the AI Gateway)
+        function getToken() {
+            return localStorage.getItem('token');
+        }
+
+        // UI helper functions
+        function showLoading() {
+            document.getElementById("loading").style.display = "block";
+            document.getElementById("dashboard-content").style.display = "none";
+            document.getElementById("error-state").style.display = "none";
+            document.getElementById("empty-state").style.display = "none";
+        }
+
+        function showError(message) {
+            document.getElementById("error-message").textContent = message;
+            document.getElementById("error-state").style.display = "block";
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("dashboard-content").style.display = "none";
+            document.getElementById("empty-state").style.display = "none";
+        }
+
+        function showDashboard() {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("dashboard-content").style.display = "block";
+            document.getElementById("error-state").style.display = "none";
+            document.getElementById("empty-state").style.display = "none";
+        }
+
+        function showEmpty() {
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("empty-state").style.display = "block";
+            document.getElementById("dashboard-content").style.display = "none";
+            document.getElementById("error-state").style.display = "none";
+        }
+
+        // Paul Tol Bright colorblind-safe palette
+        const MODEL_COLORS = {
+            'claude-sonnet': '#4477AA',
+            'claude-haiku': '#66CCEE',
+            'gpt-5.2': '#EE6677',
+            'gpt-5-mini': '#CCBB44',
+            'gpt-5-nano': '#228833',
+            'gpt-image': '#EE99AA',
+            'gemini-3-pro': '#AA3377',
+            'gemini-3-flash': '#DDCC77'
+        };
+
+        function getModelColor(modelName) {
+            const name = modelName.replace(/^[^/]+\//, '').toLowerCase();
+            for (const [key, color] of Object.entries(MODEL_COLORS)) {
+                if (name.includes(key.toLowerCase())) {
+                    return color;
+                }
+            }
+            return '#BBBBBB';
+        }
+
+        function getModelIcon(modelName) {
+            if (modelName.includes('claude')) return 'claude-icon.png';
+            if (modelName.includes('chatgpt') || modelName.includes('gpt')) return 'openai-icon.png';
+            if (modelName.includes('gemini')) return 'gemini-icon.png';
+            return 'openai-icon.png';
+        }
+
+        // Rendering functions
+        function renderChart(models, totalPercentage) {
+            const usageBar = document.querySelector('.usage-bar');
+            usageBar.innerHTML = '';
+
+            models.forEach(model => {
+                const segment = document.createElement('div');
+                segment.className = 'segment';
+                const percentage = Math.max(0, Math.min(100, parseFloat(model.percentage) || 0));
+                segment.style.setProperty('--value', percentage);
+                segment.style.setProperty('--color', getModelColor(model.model));
+                segment.setAttribute('aria-label',
+                    `${model.model}: ${percentage}% (${model.tokens.toLocaleString()} tokens)`);
+                usageBar.appendChild(segment);
+            });
+
+            const remaining = Math.max(0, 100 - totalPercentage);
+            if (remaining > 0) {
+                const remainingSegment = document.createElement('div');
+                remainingSegment.className = 'segment remaining';
+                remainingSegment.style.setProperty('--value', remaining);
+                remainingSegment.style.setProperty('--color', '#E8E8E8');
+                remainingSegment.setAttribute('aria-label', `Remaining limit: ${remaining.toFixed(1)}%`);
+                usageBar.appendChild(remainingSegment);
+            }
+        }
+
+        function renderLegend(models) {
+            const legend = document.getElementById('legend');
+            legend.innerHTML = '';
+
+            models.forEach(model => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-3 rounded-lg bg-gray-50 ring-1 ring-gray-100 px-3.5 py-3 min-h-[44px] transition hover:bg-gray-100';
+                li.setAttribute('tabindex', '0');
+
+                const icon = document.createElement('img');
+                icon.className = 'w-8 h-8 rounded flex-shrink-0 object-contain';
+                icon.src = '/dashboard/static/images/' + getModelIcon(model.model);
+                icon.alt = '';
+                li.appendChild(icon);
+
+                const colorIndicator = document.createElement('span');
+                colorIndicator.className = 'w-3.5 h-3.5 rounded flex-shrink-0 shadow-sm';
+                colorIndicator.style.backgroundColor = getModelColor(model.model);
+                li.appendChild(colorIndicator);
+
+                const details = document.createElement('div');
+                details.className = 'flex-1 flex flex-wrap gap-x-4 gap-y-0.5 items-baseline';
+
+                const modelName = document.createElement('span');
+                modelName.className = 'w-full font-semibold text-sm text-gray-900';
+                modelName.textContent = model.model;
+                details.appendChild(modelName);
+
+                const tokens = document.createElement('span');
+                tokens.className = 'text-xs text-gray-500';
+                tokens.textContent = model.tokens.toLocaleString() + ' tokens';
+                details.appendChild(tokens);
+
+                const percentage = document.createElement('span');
+                percentage.className = 'text-xs text-gray-500';
+                percentage.textContent = model.percentage + '% of limit';
+                details.appendChild(percentage);
+
+                li.appendChild(details);
+                legend.appendChild(li);
+            });
+        }
+
+        function renderScreenReaderTable(models) {
+            const tbody = document.getElementById('sr-table-body');
+            tbody.innerHTML = '';
+
+            models.forEach(model => {
+                const tr = document.createElement('tr');
+
+                const modelTd = document.createElement('td');
+                modelTd.textContent = model.model;
+                tr.appendChild(modelTd);
+
+                const tokensTd = document.createElement('td');
+                tokensTd.textContent = model.tokens.toLocaleString();
+                tr.appendChild(tokensTd);
+
+                const percentageTd = document.createElement('td');
+                percentageTd.textContent = model.percentage + '%';
+                tr.appendChild(percentageTd);
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updatePeriodHeader(periodStart, periodEnd) {
+            const header = document.getElementById('period-header');
+            header.textContent = `Week of ${periodStart} - ${periodEnd}`;
+        }
+
+        function updateTotalPercentage(percentageUsed) {
+            const totalPercentage = document.getElementById('total-percentage');
+            totalPercentage.textContent = percentageUsed + '%';
+
+            totalPercentage.classList.remove('text-amber-600', 'text-red-600', 'text-brand');
+            if (percentageUsed >= 100) {
+                totalPercentage.classList.add('text-red-600');
+            } else if (percentageUsed >= 90) {
+                totalPercentage.classList.add('text-amber-600');
+            } else {
+                totalPercentage.classList.add('text-brand');
+            }
+        }
+
+        // API fetch with retry logic
+        async function fetchUsageData(token, retries = 3) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch('/dashboard/api/usage', {
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        return await response.json();
+                    }
+
+                    // 401: token invalid/expired — redirect to login
+                    if (response.status === 401) {
+                        window.location.href = 'https://chat.example.edu';
+                        return null;
+                    }
+
+                    // Don't retry other client errors
+                    if (response.status >= 400 && response.status < 500) {
+                        throw new Error('Request failed: ' + response.status);
+                    }
+
+                    // Server error — retry
+                    throw new Error('Server error: ' + response.status);
+                } catch (error) {
+                    const isLastAttempt = i === retries - 1;
+                    if (isLastAttempt) throw error;
+                    await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+                }
+            }
+        }
+
+        // Load usage data from API
+        async function loadUsageData(token) {
+            showLoading();
+
+            try {
+                const data = await fetchUsageData(token);
+                if (!data) return; // redirect happened
+
+                if (!data.models || data.models.length === 0 || data.total_spend === 0) {
+                    showEmpty();
+                    return;
+                }
+
+                updatePeriodHeader(data.period_start, data.period_end);
+                updateTotalPercentage(data.percentage_used);
+                renderChart(data.models, data.percentage_used);
+                renderLegend(data.models);
+                renderScreenReaderTable(data.models);
+                showDashboard();
+
+                // Load coaching as a second phase (non-blocking)
+                loadCoaching(token);
+
+            } catch (error) {
+                console.error('Failed to load usage data:', error);
+                showError('Unable to load usage data. Please try again.');
+            }
+        }
+
+        // Main initialization
+        function initializeApp() {
+            showLoading();
+
+            const token = getToken();
+            if (!token) {
+                // Not logged into Open WebUI — redirect to login
+                window.location.href = 'https://chat.example.edu';
+                return;
+            }
+
+            // User is authenticated — show feedback section
+            document.getElementById('feedback-section').style.display = 'block';
+            setupFeedbackForm();
+
+            // Load usage data
+            loadUsageData(token);
+        }
+
+        // Feedback form
+        let feedbackSetup = false;
+        function setupFeedbackForm() {
+            if (feedbackSetup) return;
+            feedbackSetup = true;
+
+            const form = document.getElementById("feedback-form");
+            const textarea = document.getElementById("feedback-message");
+            const counter = document.getElementById("char-counter");
+            const submitBtn = document.getElementById("feedback-submit");
+            const errorEl = document.getElementById("feedback-error");
+            const successEl = document.getElementById("feedback-success");
+
+            textarea.addEventListener("input", function () {
+                const len = this.value.length;
+                counter.textContent = len.toLocaleString() + " / 5,000";
+                if (len >= 4500) {
+                    counter.classList.add("text-red-500", "font-semibold");
+                    counter.classList.remove("text-gray-400");
+                } else {
+                    counter.classList.remove("text-red-500", "font-semibold");
+                    counter.classList.add("text-gray-400");
+                }
+                submitBtn.disabled = len < 10;
+            });
+
+            form.addEventListener("submit", async function (e) {
+                e.preventDefault();
+                const message = textarea.value.trim();
+                if (message.length < 10) return;
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Sending\u2026";
+                errorEl.style.display = "none";
+
+                try {
+                    const token = getToken();
+                    if (!token) {
+                        window.location.href = 'https://chat.example.edu';
+                        return;
+                    }
+
+                    const res = await fetch("/dashboard/api/feedback", {
+                        method: "POST",
+                        headers: {
+                            "Authorization": "Bearer " + token,
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ message }),
+                    });
+
+                    if (res.status === 401) {
+                        window.location.href = 'https://chat.example.edu';
+                        return;
+                    }
+
+                    if (!res.ok) {
+                        const body = await res.json().catch(() => null);
+                        throw new Error(body?.detail || "Failed to send feedback.");
+                    }
+
+                    form.style.display = "none";
+                    successEl.style.display = "flex";
+
+                } catch (err) {
+                    errorEl.textContent = err.message;
+                    errorEl.style.display = "block";
+
+                    if (err.message.includes("wait")) {
+                        startCooldown(submitBtn);
+                    } else {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = "Send Feedback";
+                    }
+                }
+            });
+        }
+
+        function startCooldown(btn) {
+            let remaining = 60;
+            btn.disabled = true;
+            btn.textContent = "Wait " + remaining + "s";
+            const interval = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    btn.disabled = false;
+                    btn.textContent = "Send Feedback";
+                } else {
+                    btn.textContent = "Wait " + remaining + "s";
+                }
+            }, 1000);
+        }
+
+        // Retry button
+        function setupRetryButton() {
+            const retryButton = document.getElementById("retry-button");
+            if (retryButton) {
+                retryButton.addEventListener("click", function() {
+                    const button = this;
+                    button.disabled = true;
+                    button.textContent = 'Retrying...';
+
+                    const token = getToken();
+                    if (!token) {
+                        window.location.href = 'https://chat.example.edu';
+                        return;
+                    }
+
+                    loadUsageData(token).finally(() => {
+                        button.disabled = false;
+                        button.textContent = 'Retry';
+                    });
+                });
+            }
+        }
+
+        // Coaching section
+        const CATEGORY_LABELS = {
+            'FILES': 'Files',
+            'CONTEXT': 'Context',
+            'MODEL': 'Model',
+            'GENERAL': 'General'
+        };
+
+        function showCoachingLoading() {
+            document.getElementById('coaching-section').style.display = 'block';
+            document.getElementById('coaching-loading').style.display = 'block';
+            document.getElementById('coaching-content').style.display = 'none';
+            document.getElementById('coaching-unavailable').style.display = 'none';
+        }
+
+        function renderCoaching(data) {
+            document.getElementById('coaching-loading').style.display = 'none';
+            document.getElementById('coaching-unavailable').style.display = 'none';
+
+            // Summary
+            const summaryEl = document.getElementById('coaching-summary');
+            if (data.summary) {
+                summaryEl.textContent = data.summary;
+            } else {
+                const s = data.stats;
+                summaryEl.textContent = `You made ${s.total_requests} requests across ${s.total_chats} chats this week.`;
+            }
+
+            // Tips
+            const tipsContainer = document.getElementById('coaching-tips');
+            tipsContainer.innerHTML = '';
+
+            if (data.tips && data.tips.length > 0) {
+                data.tips.forEach(function(tip) {
+                    const card = document.createElement('div');
+                    card.className = 'coaching-tip rounded-lg bg-gray-50 ring-1 ring-gray-100 px-4 py-3';
+                    card.setAttribute('data-category', tip.category || 'GENERAL');
+
+                    const header = document.createElement('div');
+                    header.className = 'flex items-center gap-2 mb-1';
+
+                    const badge = document.createElement('span');
+                    badge.className = 'category-badge';
+                    badge.setAttribute('data-category', tip.category || 'GENERAL');
+                    badge.textContent = CATEGORY_LABELS[tip.category] || tip.category || 'Tip';
+                    header.appendChild(badge);
+
+                    const title = document.createElement('span');
+                    title.className = 'text-sm font-semibold text-gray-800';
+                    title.textContent = tip.title;
+                    header.appendChild(title);
+
+                    if (tip.estimated_savings) {
+                        const savings = document.createElement('span');
+                        savings.className = 'ml-auto text-xs font-semibold text-brand whitespace-nowrap';
+                        savings.textContent = tip.estimated_savings;
+                        header.appendChild(savings);
+                    }
+
+                    card.appendChild(header);
+
+                    const detail = document.createElement('p');
+                    detail.className = 'text-sm text-gray-600 leading-relaxed m-0';
+                    detail.textContent = tip.detail;
+                    card.appendChild(detail);
+
+                    tipsContainer.appendChild(card);
+                });
+            }
+
+            // Timestamp
+            const tsEl = document.getElementById('coaching-timestamp');
+            if (data.generated_at) {
+                try {
+                    const d = new Date(data.generated_at);
+                    tsEl.textContent = 'Last updated: ' + d.toLocaleString(undefined, {
+                        month: 'short', day: 'numeric',
+                        hour: 'numeric', minute: '2-digit'
+                    }) + (data.cached ? ' (cached)' : '');
+                } catch (e) {
+                    tsEl.textContent = '';
+                }
+            }
+
+            document.getElementById('coaching-content').style.display = 'block';
+        }
+
+        function showCoachingUnavailable() {
+            document.getElementById('coaching-loading').style.display = 'none';
+            document.getElementById('coaching-content').style.display = 'none';
+            document.getElementById('coaching-unavailable').style.display = 'block';
+        }
+
+        async function loadCoaching(token) {
+            showCoachingLoading();
+            try {
+                const response = await fetch('/dashboard/api/coaching', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 401) {
+                    // Token expired during coaching load — don't redirect,
+                    // just hide coaching (usage data already displayed)
+                    document.getElementById('coaching-section').style.display = 'none';
+                    return;
+                }
+
+                if (!response.ok) {
+                    showCoachingUnavailable();
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.status === 'ready' && data.tips && data.tips.length > 0) {
+                    renderCoaching(data);
+                } else if (data.status === 'ready') {
+                    // Ready but no tips (shouldn't happen, but handle gracefully)
+                    renderCoaching(data);
+                } else {
+                    showCoachingUnavailable();
+                }
+            } catch (err) {
+                console.error('Failed to load coaching:', err);
+                showCoachingUnavailable();
+            }
+        }
+
+        // Initialize on page load
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", () => {
+                setupRetryButton();
+                initializeApp();
+            });
+        } else {
+            setupRetryButton();
+            initializeApp();
+        }
+    </script>
+</body>
+</html>

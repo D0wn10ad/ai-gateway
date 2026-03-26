@@ -1,0 +1,323 @@
+services:
+  # PostgreSQL - Database server for OpenWebUI and LiteLLM
+  postgres:
+    image: postgres:16-alpine
+    container_name: chat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: openwebui
+      POSTGRES_MULTIPLE_DATABASES: litellm
+    command: ["postgres", "-c", "max_connections=300", "-c", "shared_buffers=512MB", "-c", "effective_cache_size=2GB", "-c", "work_mem=4MB", "-c", "maintenance_work_mem=128MB", "-c", "wal_buffers=16MB", "-c", "random_page_cost=1.1", "-c", "effective_io_concurrency=200", "-c", "max_wal_size=2GB", "-c", "jit=off", "-c", "log_min_duration_statement=250"]
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d openwebui && pg_isready -U ${POSTGRES_USER} -d litellm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chat-network
+
+  # Redis - WebSocket manager, LiteLLM cache, router state
+  redis:
+    image: redis:7-alpine
+    container_name: chat-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no", "--save", "", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--timeout", "1800", "--maxclients", "10000"]
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chat-network
+
+  # LiteLLM Proxy - AI Gateway with budget tracking
+  litellm:
+    image: ghcr.io/berriai/litellm:v1.82.3-stable
+    container_name: chat-litellm
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/litellm
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - AZURE_OPENAI_KEY=${AZURE_OPENAI_KEY:-}
+      # Uncomment if using Vertex AI with service account credentials:
+      # - GOOGLE_APPLICATION_CREDENTIALS=/app/vertex-credentials.json
+      # Production performance settings
+      - PROMETHEUS_MULTIPROC_DIR=/prometheus_multiproc
+      # Local authentication for LiteLLM Admin UI
+      - UI_USERNAME=${UI_USERNAME:-admin}
+      - UI_PASSWORD=${UI_PASSWORD}
+      # Proxy base URL for proper redirects behind nginx
+      - PROXY_BASE_URL=https://${LITELLM_DOMAIN:-litellm.example.edu}
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+      # Uncomment if using Vertex AI with service account credentials:
+      # - ./litellm/vertex-credentials.json:/app/vertex-credentials.json:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "6"]
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - chat-network
+
+  # OpenWebUI - Chat Frontend
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:v0.8.10
+    container_name: chat-openwebui
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      tika:
+        condition: service_healthy
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/openwebui
+
+      # OpenAI API (pointing to LiteLLM)
+      - OPENAI_API_BASE_URL=http://litellm:4000/v1
+      - OPENAI_API_KEY=${LITELLM_MASTER_KEY}
+      - ENABLE_OPENAI_API=true
+
+      # Disable Ollama (not using local models)
+      - ENABLE_OLLAMA_API=false
+
+      # Uvicorn workers for concurrency (default is 1)
+      - UVICORN_WORKERS=4
+
+      # Microsoft Entra ID OIDC (change to your OIDC provider)
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - MICROSOFT_CLIENT_TENANT_ID=${MICROSOFT_TENANT_ID}
+      - ENABLE_OAUTH_SIGNUP=true
+      - ENABLE_LOGIN_FORM=false
+
+      # OAuth Role-Based Access Control
+      - ENABLE_OAUTH_ROLE_MANAGEMENT=true
+      - OAUTH_ROLES_CLAIM=roles
+      - OAUTH_ALLOWED_ROLES=internal_user
+      - OAUTH_ADMIN_ROLES=proxy_admin
+      - DEFAULT_USER_ROLE=user
+
+      # User info forwarding to LiteLLM
+      - ENABLE_FORWARD_USER_INFO_HEADERS=true
+
+      # Persistent admin access (survives container updates)
+      # Set to your admin email address(es), semicolon-separated
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.edu}
+
+      # WebUI Settings
+      - WEBUI_URL=https://${CHAT_DOMAIN:-chat.example.edu}
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      - WEBUI_NAME=AI Gateway
+      - DEFAULT_MODELS=chatgpt-5.4
+
+      # Performance: thread pool, model caching, streaming, task model
+      - THREAD_POOL_SIZE=2000
+      - ENABLE_BASE_MODELS_CACHE=True
+      - MODELS_CACHE_TTL=300
+      - CHAT_RESPONSE_STREAM_DELTA_CHUNK_SIZE=5
+      - TASK_MODEL_EXTERNAL=chatgpt-5-nano
+
+      # Privacy - prevent admins from viewing user chats
+      - ENABLE_ADMIN_CHAT_ACCESS=false
+      - ENABLE_ADMIN_EXPORT=false
+
+      # Redis for WebSocket reliability across workers
+      - ENABLE_WEBSOCKET_SUPPORT=true
+      - WEBSOCKET_MANAGER=redis
+      - WEBSOCKET_REDIS_URL=redis://redis:6379/1
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_KEY_PREFIX=open-webui
+
+      # Explicit DB connection pool sizing
+      - DATABASE_POOL_SIZE=15
+      - DATABASE_POOL_MAX_OVERFLOW=10
+
+      # OAuth logout support
+      - OPENID_PROVIDER_URL=https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/v2.0/.well-known/openid-configuration
+
+      # Secure cookie — required on HTTPS to prevent cookie being sent over plain HTTP
+      - WEBUI_AUTH_COOKIE_SECURE=true
+
+      # CORS - restrict to your domain only
+      - CORS_ALLOW_ORIGIN=https://${CHAT_DOMAIN:-chat.example.edu}
+
+      # Disable features not needed
+      - ENABLE_SIGNUP=false
+      - ENABLE_RAG_WEB_SEARCH=false
+
+      # Tika - document parsing for file uploads
+      - CONTENT_EXTRACTION_ENGINE=tika
+      - TIKA_SERVER_URL=http://tika:9998
+    deploy:
+      resources:
+        limits:
+          memory: 5G
+    volumes:
+      - openwebui-data:/app/backend/data
+      # Branding - mount your custom favicon/logo files here
+      # See branding/README.md for instructions
+      # - ./branding/favicon.ico:/app/backend/static/favicon.ico:ro
+      # - ./branding/favicon.svg:/app/backend/static/favicon.svg:ro
+      # - ./branding/apple-touch-icon.png:/app/backend/static/apple-touch-icon.png:ro
+      # - ./branding/chat.svg:/app/backend/static/logo.svg:ro
+      # - ./branding/favicon.ico:/app/build/static/favicon.ico:ro
+      # - ./branding/favicon.svg:/app/build/static/favicon.svg:ro
+      # - ./branding/apple-touch-icon.png:/app/build/static/apple-touch-icon.png:ro
+      # - ./branding/logo.png:/app/build/static/logo.png:ro
+      # - ./branding/logo.png:/app/build/static/favicon.png:ro
+      # - ./branding/logo.png:/app/build/static/splash.png:ro
+      # - ./branding/logo.png:/app/build/static/splash-dark.png:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - chat-network
+
+  # Apache Tika - Document parsing for RAG/file uploads
+  tika:
+    image: apache/tika:latest-full
+    container_name: chat-tika
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9998/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - chat-network
+
+  # Usage Dashboard
+  dashboard:
+    build: ./dashboard
+    container_name: chat-dashboard
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openwebui:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/litellm
+      - OPENWEBUI_BASE_URL=http://openwebui:8080
+      - OPENWEBUI_DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/openwebui
+      - LITELLM_API_URL=http://litellm:4000
+      - COACHING_API_KEY=${COACHING_API_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-25}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-false}
+      - FEEDBACK_FROM_EMAIL=${FEEDBACK_FROM_EMAIL:-noreply@example.edu}
+      - FEEDBACK_RECIPIENTS=${FEEDBACK_RECIPIENTS:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - chat-network
+
+  # NGINX - Reverse Proxy with SSL
+  nginx:
+    image: nginx:1.28-alpine
+    container_name: chat-nginx
+    restart: unless-stopped
+    depends_on:
+      openwebui:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+      dashboard:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl/chat.crt:/etc/nginx/ssl/chat.crt:ro
+      - ./ssl/chat.key:/etc/nginx/ssl/chat.key:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    networks:
+      - chat-network
+
+  # Autoheal - Auto-restart unhealthy containers
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: chat-autoheal
+    restart: unless-stopped
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+      - AUTOHEAL_INTERVAL=30
+      - AUTOHEAL_START_PERIOD=60
+      - DOCKER_SOCK=/var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # Watchtower - Auto-update container images (disabled — can cause 502s during restarts)
+  # To re-enable: change replicas to 1 or remove the deploy block
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: chat-watchtower
+    restart: unless-stopped
+    deploy:
+      replicas: 0
+    environment:
+      - WATCHTOWER_ROLLING_RESTART=true
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_SCHEDULE=0 0 4 * * *
+      - DOCKER_API_VERSION=1.44
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+networks:
+  chat-network:
+    driver: bridge
+
+volumes:
+  openwebui-data:

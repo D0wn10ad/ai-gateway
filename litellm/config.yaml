@@ -1,0 +1,267 @@
+# LiteLLM Proxy Configuration
+# https://docs.litellm.ai/docs/proxy/configs
+
+model_list:
+  # ==================== ANTHROPIC ====================
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      description: "Anthropic's most capable model - premium option, uses budget faster"
+
+  - model_name: claude-haiku-4-5
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      description: "Fast and efficient - great for quick tasks without heavy budget impact"
+
+  # --- Anthropic thinking variants ---
+  - model_name: claude-sonnet-4-6-thinking
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+      thinking:
+        type: adaptive
+    model_info:
+      description: "Claude Sonnet with extended thinking - deeper reasoning, uses budget faster"
+
+
+  # ==================== OPENAI ====================
+  - model_name: chatgpt-5.4
+    litellm_params:
+      model: openai/gpt-5.4
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      description: "OpenAI's most capable model - premium option, uses budget faster"
+
+  - model_name: chatgpt-5-mini
+    litellm_params:
+      model: openai/gpt-5-mini
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      description: "Good balance of capability and efficiency - moderate budget usage"
+
+  - model_name: chatgpt-5-nano
+    litellm_params:
+      model: openai/gpt-5-nano
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      description: "Budget-friendly default - great for everyday tasks, lowest budget impact"
+
+  # --- OpenAI thinking variants ---
+  - model_name: chatgpt-5.4-thinking
+    litellm_params:
+      model: openai/gpt-5.4
+      api_key: os.environ/OPENAI_API_KEY
+      reasoning_effort: "medium"
+    model_info:
+      description: "GPT-5.4 with deep reasoning - most capable, uses budget faster"
+
+  - model_name: chatgpt-5-mini-thinking
+    litellm_params:
+      model: openai/gpt-5-mini
+      api_key: os.environ/OPENAI_API_KEY
+      reasoning_effort: "high"
+    model_info:
+      description: "GPT-5 Mini with reasoning - good balance, uses budget faster"
+
+  # ==================== GOOGLE VERTEX AI (Express Mode) ====================
+  # Using Vertex AI Express endpoint with API key authentication
+  # LiteLLM appends /models/{model}:generateContent to api_base
+  # Gemini 3 defaults to thinking_level=HIGH which burns budget fast.
+  # Setting reasoning_effort: low reduces thinking to save costs.
+  - model_name: gemini-3.1-pro-preview
+    litellm_params:
+      model: gemini/gemini-3.1-pro-preview
+      api_base: https://aiplatform.googleapis.com/v1/publishers/google
+      api_key: os.environ/GOOGLE_API_KEY
+      reasoning_effort: "low"
+    model_info:
+      description: "Advanced reasoning capabilities - moderate budget usage (Preview)"
+
+  - model_name: gemini-3.1-pro-preview
+    litellm_params:
+      model: gemini/gemini-3-pro-preview
+      api_base: https://aiplatform.googleapis.com/v1/publishers/google
+      api_key: os.environ/GOOGLE_API_KEY
+      reasoning_effort: "low"
+    model_info:
+      description: "Fallback: Gemini 3 Pro (Preview)"
+
+  - model_name: gemini-3-flash-preview
+    litellm_params:
+      model: gemini/gemini-3-flash-preview
+      api_base: https://aiplatform.googleapis.com/v1/publishers/google
+      api_key: os.environ/GOOGLE_API_KEY
+      reasoning_effort: "low"
+    model_info:
+      description: "Fast multimodal model - budget-friendly option (Preview)"
+
+  # --- Google thinking variants ---
+  - model_name: gemini-3.1-pro-thinking
+    litellm_params:
+      model: gemini/gemini-3.1-pro-preview
+      api_base: https://aiplatform.googleapis.com/v1/publishers/google
+      api_key: os.environ/GOOGLE_API_KEY
+      reasoning_effort: "high"
+    model_info:
+      description: "Gemini 3.1 Pro with deep thinking - advanced reasoning, uses budget faster (Preview)"
+
+  - model_name: gemini-3.1-pro-thinking
+    litellm_params:
+      model: gemini/gemini-3-pro-preview
+      api_base: https://aiplatform.googleapis.com/v1/publishers/google
+      api_key: os.environ/GOOGLE_API_KEY
+      reasoning_effort: "high"
+    model_info:
+      description: "Fallback: Gemini 3 Pro with deep thinking (Preview)"
+
+  - model_name: gemini-3-flash-thinking
+    litellm_params:
+      model: gemini/gemini-3-flash-preview
+      api_base: https://aiplatform.googleapis.com/v1/publishers/google
+      api_key: os.environ/GOOGLE_API_KEY
+      reasoning_effort: "high"
+    model_info:
+      description: "Gemini 3 Flash with deep thinking - fast reasoning, uses budget faster (Preview)"
+
+  # ==================== AZURE OPENAI (optional) ====================
+  # Uncomment and configure if you have an Azure OpenAI deployment.
+  # Replace 'your-deployment-name' and 'your-resource.openai.azure.com'
+  # with your actual Azure OpenAI deployment details.
+  #
+  # - model_name: copilot
+  #   litellm_params:
+  #     model: azure/your-deployment-name
+  #     api_base: https://your-resource.openai.azure.com
+  #     api_key: os.environ/AZURE_OPENAI_KEY
+  #     api_version: "2025-01-01-preview"
+  #   model_info:
+  #     base_model: azure/gpt-5
+  #     description: "Azure OpenAI - premium option, uses budget faster"
+  #     input_cost_per_token: 0.00000125
+  #     output_cost_per_token: 0.00001
+  #
+  # - model_name: copilot-thinking
+  #   litellm_params:
+  #     model: azure/your-deployment-name
+  #     api_base: https://your-resource.openai.azure.com
+  #     api_key: os.environ/AZURE_OPENAI_KEY
+  #     api_version: "2025-01-01-preview"
+  #     reasoning_effort: "high"
+  #   model_info:
+  #     base_model: azure/gpt-5
+  #     description: "Azure OpenAI with deep reasoning - uses budget faster"
+  #     input_cost_per_token: 0.00000125
+  #     output_cost_per_token: 0.00001
+
+  # ==================== IMAGE GENERATION ====================
+  - model_name: gpt-image-1.5
+    litellm_params:
+      model: openai/gpt-image-1.5
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      mode: image_generation
+      description: "Advanced image generation - each image uses a portion of your budget"
+      input_cost_per_image: 0.04
+
+  - model_name: gemini-3-pro-image-preview
+    litellm_params:
+      model: gemini/gemini-3-pro-image-preview
+      api_base: https://aiplatform.googleapis.com/v1/publishers/google
+      api_key: os.environ/GOOGLE_API_KEY
+    model_info:
+      mode: image_generation
+      description: "Google image generation - more budget-friendly than GPT images (Preview)"
+      input_cost_per_image: 0.02
+
+litellm_settings:
+  # Redis caching — deduplicate similar queries, save budget
+  cache: true
+  cache_params:
+    type: redis
+    host: redis
+    port: 6379
+    ttl: 3600
+
+  # Structured JSON logs — grep-able per-request detail (model, TTFT, tokens, user)
+  # set_verbose: false prevents the extremely chatty debug output (that's the perf killer)
+  # Standard request logging stays on for diagnosing slowness
+  json_logs: true
+  set_verbose: false
+
+  # Don't store message/response content in SpendLogs (metadata is preserved)
+  turn_off_message_logging: true
+
+  # Prometheus metrics at /metrics (per-model latency, TTFT, tokens, errors)
+  callbacks: ["prometheus"]
+
+  # Drop unsupported parameters instead of erroring
+  drop_params: true
+
+  # Auto-handle thinking + tool calling incompatibility
+  modify_params: true
+
+  # Request timeout — max time to wait for a complete response from the provider.
+  # Set high to accommodate thinking models with long reasoning chains.
+  request_timeout: 600
+
+  # Default max budget per end-user (in USD) - $5 weekly
+  # NOTE: These settings are a first line of defense but are unreliable for
+  # users created via header-based identification (x-openwebui-user-email).
+  # Actual enforcement is via:
+  #   1. PostgreSQL BEFORE INSERT trigger (postgres-init/02-budget-trigger.sh)
+  #   2. Hourly cron script (scripts/enforce-budgets.sh)
+  max_end_user_budget: 5.0
+  budget_duration: 7d
+  timezone: America/New_York
+
+  # Assign default budget to all new end users
+  # NOTE: Unreliable for header-based users — trigger + cron are the real enforcement
+  default_end_user_params:
+    budget_id: weekly-5-usd
+
+  # Capture OpenWebUI headers as spend tags for tracking (lowercase!)
+  extra_spend_tag_headers:
+    - "x-openwebui-user-id"
+    - "x-openwebui-user-email"
+    - "x-openwebui-user-name"
+
+general_settings:
+  # Master key for admin operations
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+  # Database for spend tracking
+  database_url: os.environ/DATABASE_URL
+
+  # Store model info in DB for better tracking
+  store_model_in_db: true
+
+  # Don't write error logs to DB (reduces write pressure)
+  disable_error_logs: true
+
+  # Auto-delete SpendLogs older than 90 days
+  maximum_spend_logs_retention_period: "90d"
+
+  # Batch spend writes every 60s instead of per-request (biggest DB pressure relief)
+  proxy_batch_write_at: 60
+
+  # Explicit DB connection pool sizing (per worker)
+  database_connection_pool_limit: 10
+  database_connection_timeout: 60
+
+  # Map OpenWebUI user header to LiteLLM user tracking (lowercase!)
+  user_header_name: x-openwebui-user-email
+
+# Router settings for load balancing and failover
+router_settings:
+  routing_strategy: latency-based-routing
+  num_retries: 2
+  timeout: 300
+  retry_after: 5
+  allowed_fails: 3
+  cooldown_time: 60
+  redis_host: redis
+  redis_port: 6379
