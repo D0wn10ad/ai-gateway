@@ -1,15 +1,52 @@
-# Webui Cost tracking
+# Overall
+https://docs.litellm.ai/docs/proxy/docker_quick_start
+https://github.com/BerriAI/litellm/pkgs/container/litellm-non_root
+https://www.tanyongsheng.com/note/running-litellm-and-openwebui-on-windows-localhost-a-comprehensive-guide/
+
+# SSO
+https://docs.openwebui.com/troubleshooting/sso/
+https://www.cnblogs.com/huanghongbo/p/18763901
+
+# Webui
+## Cost tracking
 https://docs.litellm.ai/docs/proxy/forward_client_headers
+1. use scripts/new-user-creation.py to ensure the id are the same uuid in both open-webui and litellm (even without SSO)
 
-use scripts/new-user-creation.py to ensure the id are the same uuid in both open-webui and litellm (even without SSO)
+## Workspace: Skills/Prompts/Knowledge/Tools
+https://blog.csdn.net/gitblog_00441/article/details/152034940
+https://barbaronno.github.io/docs/features/workspace/knowledge/
 
-# Webui Skills
+## MCP
 
-# Webui Prompts
+## LLM Model
+### Unresolved
+https://docs.openwebui.com/features/chat-conversations/chat-features/reasoning-models/
 
-# Webui MCP
+### System prompt
+```
+Instruction for Code & Data:
+When generating any programming code, JSON, YAML, XML, or shell scripts, you MUST wrap them in triple backticks with the language identifier.
+For JSON, use: ```json
+For YAML, use: ```yaml
+For Python/JS/etc., use the appropriate tag.
+Do not output code without markdown formatting.
+Keep explanations concise and separate them from the code blocks.
+```
+# Litellm 
+## Model
+https://docs.litellm.ai/docs/providers/azure
 
-# Litellm MCP
+https://docs.litellm.ai/docs/budget_manager
+https://docs.litellm.ai/docs/proxy/virtual_keys
+## MCP
+
+## Guardrail + Presidio PII
+https://docs.litellm.ai/docs/proxy/guardrails/pii_masking_v2
+Beyond Litellm: 
+https://github.com/microsoft/presidio
+### Deployment
+https://microsoft.github.io/presidio/installation/#using-docker
+https://hub.docker.com/r/microsoft/presidio-anonymizer
 
 # Integration with opencode
 https://docs.litellm.ai/docs/tutorials/opencode_integration
