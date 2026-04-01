@@ -81,17 +81,23 @@ def provision_litellm(user_uuid, email, verify_ssl):
        "max_budget": 10,
         "user_email": email,
         "user_id": user_uuid,
-        "user_role": "internal_user"
+        "user_role": "internal_user",
+        #"send_invite_email": True,
+        "auto_create_key": False
     }
 
     # Idempotent user creation in LiteLLM
-    requests.post(f"{LT_URL}/user/new", json=lt_payload, headers=headers, verify=verify_ssl).raise_for_status()
+    new_user = requests.post(f"{LT_URL}/user/new", json=lt_payload, headers=headers, verify=verify_ssl)
+    new_user.raise_for_status()
+    result = new_user.json()
 
     # Generate the invitation link
     inv_resp = requests.post(f"{LT_URL}/invitation/new", json={"user_id": user_uuid}, headers=headers, verify=verify_ssl)
     inv_resp.raise_for_status()
-    
-    return inv_resp.json().get("invitation_link")
+    result = inv_resp.json()
+
+
+    return f"""{LT_URL}/ui/?invitation_id={result.get("id")}"""
 
 def main():
     parser = argparse.ArgumentParser(description="Onboard Open WebUI users to LiteLLM for cost tracking.")
